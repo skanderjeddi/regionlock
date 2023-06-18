@@ -1,6 +1,6 @@
 # regionlock
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg?style=flat-square)](https://semver.org)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg?style=flat-square)](https://semver.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 
 `regionlock` is a region locking C library based on POSIX locks. It provides an API that can be used to implement robust and efficient inter-process locking of file regions, allowing for fine-grained concurrency control in multi-threaded applications.
