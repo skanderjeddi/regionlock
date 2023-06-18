@@ -126,6 +126,21 @@ int main(int argc, char** argv) {
         // This should block until the read lock is removed by the parent process (after 5 seconds) 
         // ... but it's not. Why?
         rl_util_show_global_state("after setting lock #3");
+        char buffer[17];
+        ssize_t read_result = rl_read(descriptor, buffer, 8);
+        if (read_result == -1) {
+            critical("failed to read from file!\n");
+            return EXIT_FAILURE;
+        }
+        buffer[read_result] = '\0';
+        trace("read from file successfully: %s\n", buffer);
+        lseek(descriptor.descriptor, 43, SEEK_SET);
+        ssize_t write_result = rl_write(descriptor, "hello", 5);
+        if (write_result == -1) {
+            critical("failed to write to file!\n");
+            return EXIT_FAILURE;
+        }
+        trace("wrote to file successfully.\n");
         int close_result = rl_close(descriptor);
         if (close_result == -1) {
             critical("failed to close file!\n");

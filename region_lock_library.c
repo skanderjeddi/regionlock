@@ -654,3 +654,107 @@ int rl_fcntl(rl_descriptor descriptor, int command, struct flock* lock) {
     pthread_mutex_unlock(&(file->mutex));
     return result;
 }
+
+ssize_t rl_read(rl_descriptor descriptor, void* buffer, size_t count) {
+    if (descriptor.descriptor == -1) {
+        severe("invalid descriptor!\n");
+        return -1;
+    }
+    rl_file* file = descriptor.file;
+    pthread_mutex_lock(&(file->mutex));
+    info("file retrieved & mutex locked.\n");
+    ssize_t result;
+    // Get the cursor position 
+    size_t position = lseek(descriptor.descriptor, 0, SEEK_CUR);
+    if (!descriptor.file->locks[0].is_initialized) {
+        result = read(descriptor.descriptor, buffer, count);
+    } else {
+        // Go through each lock and check if it conflicts with the read
+        size_t i;
+        boolean has_read_lock = false;
+        for (i = 0; i < RL_LCKMAXLCKS; ++i) {
+            rl_lock* current_lock = &(file->locks[i]);
+            // If the lock is not initialized, we can safely skip it
+            if (!current_lock->is_initialized) {
+                continue;
+            }
+            if (position + count <= current_lock->offset + current_lock->size && 
+                position >= current_lock->offset) {
+                // We have a conflict - check the type of locks
+                if (current_lock->type == F_WRLCK) {
+                    // A write lock is requested - conflict
+                    warn("can't read, write lock exists!\n");
+                    pthread_mutex_unlock(&(file->mutex));
+                    return -1;
+                } else {
+                    for (size_t j = 0; j < RL_LCKMAXOWNERS; ++j) {
+                        if (current_lock->owners[j].thread_id == getpid() && current_lock->owners[j].descriptor == descriptor.descriptor) {
+                            has_read_lock = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        if (has_read_lock) {
+            result = read(descriptor.descriptor, buffer, count);
+        } else {
+            warn("can't read, no read lock for thread %ld!\n", getpid());
+            result = -1;
+        }
+    }
+    pthread_mutex_unlock(&(file->mutex));
+    return result;
+}
+
+ssize_t rl_write(rl_descriptor descriptor, const void* buffer, size_t count) {
+    if (descriptor.descriptor == -1) {
+        severe("invalid descriptor!\n");
+        return -1;
+    }
+    rl_file* file = descriptor.file;
+    pthread_mutex_lock(&(file->mutex));
+    info("file retrieved & mutex locked.\n");
+    ssize_t result;
+    // Get the cursor position 
+    size_t position = lseek(descriptor.descriptor, 0, SEEK_CUR);
+    if (!descriptor.file->locks[0].is_initialized) {
+        result = write(descriptor.descriptor, buffer, count);
+    } else {
+        // Go through each lock and check if it conflicts with the write
+        size_t i;
+        boolean has_write_lock = false;
+        for (i = 0; i < RL_LCKMAXLCKS; ++i) {
+            rl_lock* current_lock = &(file->locks[i]);
+            // If the lock is not initialized, we can safely skip it
+            if (!current_lock->is_initialized) {
+                continue;
+            }
+            if (position + count <= current_lock->offset + current_lock->size && 
+                position >= current_lock->offset) {
+                // We have a conflict - check the type of locks
+                if (current_lock->type == F_WRLCK) {
+                    // A write lock is requested - conflict
+                    for (size_t j = 0; j < RL_LCKMAXOWNERS; ++j) {
+                        if (current_lock->owners[j].thread_id == getpid() && current_lock->owners[j].descriptor == descriptor.descriptor) {
+                            has_write_lock = true;
+                            break;
+                        }
+                    }
+                } else {
+                    warn("can't write, read lock exists!\n");
+                    pthread_mutex_unlock(&(file->mutex));
+                    return -1;
+                }
+            }
+        }
+        if (has_write_lock) {
+            result = write(descriptor.descriptor, buffer, count);
+        } else {
+            warn("can't write, no write lock for thread %ld!\n", getpid());
+            result = -1;
+        }
+    }
+    pthread_mutex_unlock(&(file->mutex));
+    return result;
+}

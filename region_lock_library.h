@@ -101,4 +101,7 @@ pid_t rl_fork();
 
 int rl_fcntl(rl_descriptor, int, struct flock*);
 
+ssize_t rl_write(rl_descriptor, const void*, size_t);
+ssize_t rl_read(rl_descriptor, void*, size_t);
+
 #endif /* __REGION_LOCK_LIBRARY_H__ */
