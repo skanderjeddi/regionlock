@@ -147,7 +147,7 @@ void rl_util_show_global_state(const char* message)  {
     if (rl_library.total_files > 0) {
         for (size_t file_index = 0; file_index < rl_library.total_files; file_index++) {
             rl_file* file = rl_library.files[file_index];
-            size_t file_header_size = hues_format_p(buffer + written, BUFFER_SIZE * 2, "|-%d- file mapped at '/dev/shm%s'\n", file_index, file->shared_memory_object_name, file->users_on_file);
+            size_t file_header_size = hues_format_p(buffer + written, BUFFER_SIZE * 2, "|- %d - file mapped at '/dev/shm%s'\n", file_index + 1, file->shared_memory_object_name, file->users_on_file);
             written += file_header_size;
             for (size_t lock_index = 0; lock_index < RL_LCKMAXLCKS; lock_index++) {
                 rl_lock* current_lock = &(file->locks[lock_index]);
@@ -164,10 +164,10 @@ void rl_util_show_global_state(const char* message)  {
                 }
                 if (has_owners) {
                     // Using warn, print the lock's information in the format: "pointer address [start; start+len] type as string [readers | writer as int]"
-                    written += hues_format_p(buffer + written, BUFFER_SIZE * 2, "|--%ld-- lock [%ld; %ld] %s [%ld | %d]\n", lock_index, current_lock->offset, current_lock->offset + current_lock->size, rl_util_get_lock_type_as_string(current_lock->type), current_lock->readers_count, current_lock->has_writer);
+                    written += hues_format_p(buffer + written, BUFFER_SIZE * 2, "|-- %ld -- lock [%ld; %ld] %s [%ld | %d]\n", lock_index + 1, current_lock->offset, current_lock->offset + current_lock->size, rl_util_get_lock_type_as_string(current_lock->type), current_lock->readers_count, current_lock->has_writer);
                     for (size_t owner_index = 0; owner_index < RL_LCKMAXOWNERS; owner_index++) {
                         if (current_lock->owners[owner_index].thread_id != 0) {
-                            written += hues_format_p(buffer + written, BUFFER_SIZE * 2, "|---%ld--- owner #%d\n", owner_index, current_lock->owners[owner_index].thread_id);
+                            written += hues_format_p(buffer + written, BUFFER_SIZE * 2, "|--- %ld --- owner #%d\n", owner_index + 1, current_lock->owners[owner_index].thread_id);
                         }
                     }
                 }
@@ -238,7 +238,7 @@ rl_descriptor rl_open(const char* path, int flags) {
     } // If the shared memory object name cannot be retrieved, return RL_OPEN_FAILED.
     boolean shared_memory_object_exists = false;
     // Open the shared memory object.
-    int shared_memory_object_descriptor = shm_open(shared_memory_object_name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+    int shared_memory_object_descriptor = shm_open(shared_memory_object_name, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
     if (shared_memory_object_descriptor == -1 && errno != EEXIST) { // If the shared memory object cannot be opened and the error is not that it already exists, return RL_OPEN_FAILED.
         critical("shared memory object cannot be opened\n");
         close(descriptor);
@@ -294,8 +294,10 @@ rl_descriptor rl_open(const char* path, int flags) {
         rl_descriptor.file = file;
         debug("shared memory object initialized (cold).\n");
         trace("%ld user(s) on file (cold).\n", file->users_on_file);
+        // Add the file descriptor to the library.
+        rl_library.files[rl_library.total_files] = rl_descriptor.file;
+        rl_library.total_files++;
     } else {
-        warn("shared memory object already exists!\n");        
         rl_core_initialize_mutex(file);
         pthread_mutex_lock(&(file->mutex));
         trace("mutex locked (warm).\n");
@@ -307,9 +309,6 @@ rl_descriptor rl_open(const char* path, int flags) {
         rl_descriptor.file = file;
         debug("shared memory object initialized (warm).\n");
     }
-    // Add the file descriptor to the library.
-    rl_library.files[rl_library.total_files] = rl_descriptor.file;
-    rl_library.total_files++;
     info("%ld mapped file(s).\n", rl_library.total_files);
     close(shared_memory_object_descriptor); // Close the shared memory object descriptor.
     info("shared memory object descriptor closed.\n");

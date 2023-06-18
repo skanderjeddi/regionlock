@@ -27,6 +27,7 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <signal.h>
+#include <assert.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
